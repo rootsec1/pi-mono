@@ -21,6 +21,10 @@ import type {
 	AgentMessage,
 	AgentState,
 	AgentTool,
+	AfterToolCallContext,
+	AfterToolCallResult,
+	BeforeToolCallContext,
+	BeforeToolCallResult,
 	ThinkingLevel,
 } from "@mariozechner/pi-agent-core";
 import type { AssistantMessage, ImageContent, Message, Model, TextContent } from "@mariozechner/pi-ai";
@@ -161,6 +165,10 @@ export interface AgentSessionConfig {
 	extensionRunnerRef?: { current?: ExtensionRunner };
 	/** Session start event metadata emitted when extensions bind to this runtime. */
 	sessionStartEvent?: SessionStartEvent;
+	/** Optional generic tool hook invoked before the extension tool-call hook. */
+	beforeToolCall?: (context: BeforeToolCallContext, signal?: AbortSignal) => Promise<BeforeToolCallResult | undefined>;
+	/** Optional generic tool hook invoked after the extension tool-result hook. */
+	afterToolCall?: (context: AfterToolCallContext, signal?: AbortSignal) => Promise<AfterToolCallResult | undefined>;
 }
 
 export interface ExtensionBindings {
@@ -280,6 +288,14 @@ export class AgentSession {
 	private _initialActiveToolNames?: string[];
 	private _baseToolsOverride?: Record<string, AgentTool>;
 	private _sessionStartEvent: SessionStartEvent;
+	private _userBeforeToolCall?: (
+		context: BeforeToolCallContext,
+		signal?: AbortSignal,
+	) => Promise<BeforeToolCallResult | undefined>;
+	private _userAfterToolCall?: (
+		context: AfterToolCallContext,
+		signal?: AbortSignal,
+	) => Promise<AfterToolCallResult | undefined>;
 	private _extensionUIContext?: ExtensionUIContext;
 	private _extensionCommandContextActions?: ExtensionCommandContextActions;
 	private _extensionShutdownHandler?: ShutdownHandler;
@@ -311,6 +327,8 @@ export class AgentSession {
 		this._initialActiveToolNames = config.initialActiveToolNames;
 		this._baseToolsOverride = config.baseToolsOverride;
 		this._sessionStartEvent = config.sessionStartEvent ?? { type: "session_start", reason: "startup" };
+		this._userBeforeToolCall = config.beforeToolCall;
+		this._userAfterToolCall = config.afterToolCall;
 
 		// Always subscribe to agent events for internal handling
 		// (session persistence, extensions, auto-compaction, retry logic)
@@ -363,7 +381,12 @@ export class AgentSession {
 	 * happens here instead of in wrappers.
 	 */
 	private _installAgentToolHooks(): void {
-		this.agent.beforeToolCall = async ({ toolCall, args }) => {
+		this.agent.beforeToolCall = async (context, signal) => {
+			const userBeforeResult = await this._userBeforeToolCall?.(context, signal);
+			if (userBeforeResult?.block) {
+				return userBeforeResult;
+			}
+
 			const runner = this._extensionRunner;
 			if (!runner?.hasHandlers("tool_call")) {
 				return undefined;
@@ -374,9 +397,9 @@ export class AgentSession {
 			try {
 				return await runner.emitToolCall({
 					type: "tool_call",
-					toolName: toolCall.name,
-					toolCallId: toolCall.id,
-					input: args as Record<string, unknown>,
+					toolName: context.toolCall.name,
+					toolCallId: context.toolCall.id,
+					input: context.args as Record<string, unknown>,
 				});
 			} catch (err) {
 				if (err instanceof Error) {
@@ -386,30 +409,47 @@ export class AgentSession {
 			}
 		};
 
-		this.agent.afterToolCall = async ({ toolCall, args, result, isError }) => {
+		this.agent.afterToolCall = async (context, signal) => {
 			const runner = this._extensionRunner;
-			if (!runner?.hasHandlers("tool_result")) {
-				return undefined;
+			let currentResult = context.result;
+			let currentIsError = context.isError;
+
+			if (runner?.hasHandlers("tool_result")) {
+				const hookResult = await runner.emitToolResult({
+					type: "tool_result",
+					toolName: context.toolCall.name,
+					toolCallId: context.toolCall.id,
+					input: context.args as Record<string, unknown>,
+					content: currentResult.content,
+					details: currentResult.details,
+					isError: currentIsError,
+				});
+
+				if (hookResult) {
+					currentResult = {
+						content: hookResult.content,
+						details: hookResult.details,
+					};
+					currentIsError = hookResult.isError ?? currentIsError;
+				}
 			}
 
-			const hookResult = await runner.emitToolResult({
-				type: "tool_result",
-				toolName: toolCall.name,
-				toolCallId: toolCall.id,
-				input: args as Record<string, unknown>,
-				content: result.content,
-				details: result.details,
-				isError,
-			});
-
-			if (!hookResult) {
+			const userAfterResult = await this._userAfterToolCall?.(
+				{
+					...context,
+					result: currentResult,
+					isError: currentIsError,
+				},
+				signal,
+			);
+			if (!userAfterResult) {
 				return undefined;
 			}
 
 			return {
-				content: hookResult.content,
-				details: hookResult.details,
-				isError: hookResult.isError ?? isError,
+				content: userAfterResult.content ?? currentResult.content,
+				details: userAfterResult.details ?? currentResult.details,
+				isError: userAfterResult.isError ?? currentIsError,
 			};
 		};
 	}

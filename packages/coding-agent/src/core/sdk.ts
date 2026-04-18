@@ -1,5 +1,13 @@
 import { join } from "node:path";
-import { Agent, type AgentMessage, type ThinkingLevel } from "@mariozechner/pi-agent-core";
+import {
+	Agent,
+	type AgentMessage,
+	type ThinkingLevel,
+	type AfterToolCallContext,
+	type AfterToolCallResult,
+	type BeforeToolCallContext,
+	type BeforeToolCallResult,
+} from "@mariozechner/pi-agent-core";
 import { type Message, type Model, streamSimple } from "@mariozechner/pi-ai";
 import { getAgentDir, getDocsPath } from "../config.js";
 import { AgentSession } from "./agent-session.js";
@@ -72,6 +80,10 @@ export interface CreateAgentSessionOptions {
 	settingsManager?: SettingsManager;
 	/** Session start event metadata for extension runtime startup. */
 	sessionStartEvent?: SessionStartEvent;
+	/** Optional generic tool hook invoked before extension tool-call handling. */
+	beforeToolCall?: (context: BeforeToolCallContext, signal?: AbortSignal) => Promise<BeforeToolCallResult | undefined>;
+	/** Optional generic tool hook invoked after extension tool-result handling. */
+	afterToolCall?: (context: AfterToolCallContext, signal?: AbortSignal) => Promise<AfterToolCallResult | undefined>;
 }
 
 /** Result from createAgentSession */
@@ -364,6 +376,8 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 		initialActiveToolNames,
 		extensionRunnerRef,
 		sessionStartEvent: options.sessionStartEvent,
+		beforeToolCall: options.beforeToolCall,
+		afterToolCall: options.afterToolCall,
 	});
 	const extensionsResult = resourceLoader.getExtensions();
 

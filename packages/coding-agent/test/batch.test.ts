@@ -80,4 +80,21 @@ describe("batch session helpers", () => {
 
 		expect(onEvent).toHaveBeenCalledWith({ type: "agent_start" }, session);
 	});
+
+	it("forwards generic tool hooks to createAgentSession", async () => {
+		const beforeToolCall = vi.fn();
+		const afterToolCall = vi.fn();
+
+		await createBatchSession({
+			cwd: "/tmp/project",
+			beforeToolCall,
+			afterToolCall,
+		});
+
+		expect(createAgentSession).toHaveBeenCalledWith({
+			cwd: "/tmp/project",
+			beforeToolCall,
+			afterToolCall,
+		});
+	});
 });
