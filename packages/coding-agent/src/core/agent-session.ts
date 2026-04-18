@@ -427,8 +427,8 @@ export class AgentSession {
 
 				if (hookResult) {
 					currentResult = {
-						content: hookResult.content,
-						details: hookResult.details,
+						content: hookResult.content ?? currentResult.content,
+						details: hookResult.details ?? currentResult.details,
 					};
 					currentIsError = hookResult.isError ?? currentIsError;
 				}
