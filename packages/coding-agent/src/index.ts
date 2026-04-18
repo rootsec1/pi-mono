@@ -1,18 +1,18 @@
 // Core session management
 
-// Config paths
-export { getAgentDir, VERSION } from "./config.js";
 export {
-	createBatchSession,
 	type BatchEventHandler,
 	type BatchHook,
 	type BatchRunResult,
 	type CreateBatchSessionOptions,
 	type CreateBatchSessionResult,
+	createBatchSession,
 	type RunBatchOptions,
 	type RunBatchSessionOptions,
 	runBatchSession,
 } from "./batch.js";
+// Config paths
+export { getAgentDir, VERSION } from "./config.js";
 export {
 	AgentSession,
 	type AgentSessionConfig,

@@ -1,18 +1,10 @@
 import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import type { AgentSession, AgentSessionEvent, PromptOptions } from "./core/agent-session.js";
-import {
-	createAgentSession,
-	type CreateAgentSessionOptions,
-	type CreateAgentSessionResult,
-} from "./core/sdk.js";
+import { type CreateAgentSessionOptions, type CreateAgentSessionResult, createAgentSession } from "./core/sdk.js";
 
-export interface BatchEventHandler {
-	(event: AgentSessionEvent, session: AgentSession): Promise<void> | void;
-}
+export type BatchEventHandler = (event: AgentSessionEvent, session: AgentSession) => Promise<void> | void;
 
-export interface BatchHook {
-	(session: AgentSession): Promise<void> | void;
-}
+export type BatchHook = (session: AgentSession) => Promise<void> | void;
 
 export interface CreateBatchSessionOptions extends CreateAgentSessionOptions {
 	onEvent?: BatchEventHandler;
@@ -37,9 +29,7 @@ export interface CreateBatchSessionResult extends CreateAgentSessionResult {
 	run(options: RunBatchOptions): Promise<BatchRunResult>;
 }
 
-export async function createBatchSession(
-	options: CreateBatchSessionOptions = {},
-): Promise<CreateBatchSessionResult> {
+export async function createBatchSession(options: CreateBatchSessionOptions = {}): Promise<CreateBatchSessionResult> {
 	const { onEvent, ...sessionOptions } = options;
 	const created = await createAgentSession(sessionOptions);
 
@@ -60,11 +50,8 @@ export async function createBatchSession(
 	};
 }
 
-export async function runBatchSession(
-	options: RunBatchSessionOptions,
-): Promise<BatchRunResult> {
-	const { prompt, promptOptions, beforePrompt, beforeFinish, ...sessionOptions } =
-		options;
+export async function runBatchSession(options: RunBatchSessionOptions): Promise<BatchRunResult> {
+	const { prompt, promptOptions, beforePrompt, beforeFinish, ...sessionOptions } = options;
 	const created = await createBatchSession(sessionOptions);
 	return runBatchPrompt(created.session, {
 		prompt,
@@ -74,10 +61,7 @@ export async function runBatchSession(
 	});
 }
 
-async function runBatchPrompt(
-	session: AgentSession,
-	options: RunBatchOptions,
-): Promise<BatchRunResult> {
+async function runBatchPrompt(session: AgentSession, options: RunBatchOptions): Promise<BatchRunResult> {
 	await options.beforePrompt?.(session);
 	await session.prompt(options.prompt, options.promptOptions);
 	await options.beforeFinish?.(session);
@@ -89,9 +73,7 @@ async function runBatchPrompt(
 }
 
 function extractFinalAssistantText(messages: AgentMessage[]): string {
-	const assistant = [...messages]
-		.reverse()
-		.find((message) => message.role === "assistant");
+	const assistant = [...messages].reverse().find((message) => message.role === "assistant");
 	return assistant ? extractMessageText(assistant) : "";
 }
 
