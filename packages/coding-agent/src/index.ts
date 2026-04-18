@@ -3,6 +3,17 @@
 // Config paths
 export { getAgentDir, VERSION } from "./config.js";
 export {
+	createBatchSession,
+	type BatchEventHandler,
+	type BatchHook,
+	type BatchRunResult,
+	type CreateBatchSessionOptions,
+	type CreateBatchSessionResult,
+	type RunBatchOptions,
+	type RunBatchSessionOptions,
+	runBatchSession,
+} from "./batch.js";
+export {
 	AgentSession,
 	type AgentSessionConfig,
 	type AgentSessionEvent,
