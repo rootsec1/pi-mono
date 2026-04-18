@@ -182,11 +182,19 @@ export function getBundledInteractiveAssetPath(name: string): string {
 // App Config (from package.json piConfig)
 // =============================================================================
 
-const pkg = JSON.parse(readFileSync(getPackageJsonPath(), "utf-8"));
+function readPackageConfig(): { piConfig?: { name?: string; configDir?: string }; version?: string } {
+	try {
+		return JSON.parse(readFileSync(getPackageJsonPath(), "utf-8"));
+	} catch {
+		return {};
+	}
+}
+
+const pkg = readPackageConfig();
 
 export const APP_NAME: string = pkg.piConfig?.name || "pi";
 export const CONFIG_DIR_NAME: string = pkg.piConfig?.configDir || ".pi";
-export const VERSION: string = pkg.version;
+export const VERSION: string = pkg.version || "0.0.0";
 
 // e.g., PI_CODING_AGENT_DIR or TAU_CODING_AGENT_DIR
 export const ENV_AGENT_DIR = `${APP_NAME.toUpperCase()}_CODING_AGENT_DIR`;
